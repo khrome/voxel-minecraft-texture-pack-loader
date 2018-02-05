@@ -1,9 +1,9 @@
 {
     "name": "voxel-minecraft-texture-pack-loader",
     "homepage": "https://github.com/khrome/voxel-minecraft-texture-pack-loader",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "main": "voxel-loader.js",
-    "description": "Biomes for voxeljs",
+    "description": "Load standard texture pack layouts",
     "keywords": [
         "voxel.js",
         "voxel",
@@ -22,9 +22,9 @@
         "url": "git://github.com/khrome/voxel-minecraft-texture-pack-loader.git"
     },
     "dependencies": {
-        "voxel" : "*",
-        "seed-random" : "*",
-        "perlin" : "*"
+        "group-by-subsequence": "^0.0.3",
+        "csv": "^2.0.0",
+        "levenshtein": "^1.0.5",
     },
     "devDependencies": {},
     "optionalDependencies": {},

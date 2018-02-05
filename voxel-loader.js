@@ -1,5 +1,9 @@
 var csv = require('csv');
 var fs = require('fs');
+var Levenshtein = require('levenshtein');
+var distance = function(a, b){
+    return new Levenshtein( a, b ).distance
+}
 var group = require('group-by-subsequence');
 //todo: enable client use
 
@@ -13,6 +17,15 @@ function metaData(cb){
 
 var minecraftData = {};
 
+var aliasWords = {
+    wood : 'log',
+    smooth : 'polished',
+}
+
+var alias = function(key){
+    return aliasWords[key.toLowerCase?key.toLowerCase():key] || key;
+}
+
 function minecraftLoader(directory, cb){
     //todo: cache switch
     if(minecraftData[directory]) return cb(undefined, minecraftData[directory]);
@@ -20,12 +33,15 @@ function minecraftLoader(directory, cb){
     fs.readdir(dir,function(err, list){
         var blocks = group(list, {
             stopwords : [
-                'log', 'rail', 'trip', 'sapling', 'leaves',
-                'mushroom', 'nether', 'bed'
+                'log', 'rail', 'trip', 'sapling', 'leaves', 'hardened',
+                'mushroom', 'nether', 'bed', 'red', 'sea', 'quartz', 'planks','stone',
+                'flower', 'emerald', 'diamond', 'coal', 'gold', 'iron'
             ],
             replacements : {
-                png : 'side'
+                png : 'side',
+                smooth : 'polished'
             },
+            alias : aliasWords,
             wordBoundary : '_',
             objectReturn : function(s, prefix){
                 return s.substring(prefix.length).split('.').shift();
@@ -34,66 +50,60 @@ function minecraftLoader(directory, cb){
         metaData(function(err, materials){
             var finalMaterials = [];
             var flatIndex = [];
-            materials.forEach(function(material, index){
+            var out;
+            materials.map(function(material, materialIndex){
                 var simpleName = material[3].split(':').pop();
                 var meta = {
                     id : material[0].trim(),
-                    label : material[1].trim(),
+                    label : material[1].trim()
+                        //should be fixed in list
+                        .replace('Wood Plank', 'Plank'),
                     index : parseInt(material[2]),
                     code : material[3].trim(),
-                    actualIndex : index,
-                    flatIndex : index,
+                    actualIndex : materialIndex,
+                    flatIndex : materialIndex,
                 };
-
-                var cans = [];
-                var keywords;
-                var labelwords;
+                var labelwords = meta.label.toLowerCase().split(' ');
                 var blockNameIndex = Object.keys(blocks);
-                blockNameIndex.forEach(function(key, index){
+                var blockLabels = blockNameIndex.map(function(key, blockIndex){
+                    var buff = {};
+                    var can = 0;
                     keywords = key.split('_');
-                    cans[index] = 0;
-                    keywords.forEach(function(keyword){
-                        labelwords = meta.label.toLowerCase().split(' ');
-                        labelwords.forEach(function(labelword){
-                            if(labelword === keyword){
-                                cans[index]++;
+                    var matches = labelwords.map(function(l){
+                        var labelword = alias(l); //labels haven't been aliased
+                        var bestWord = keywords.map(function(keyword){
+                            var dis = distance(keyword, labelword);
+                            var diff = (labelword.length-Math.abs(keyword.length - labelword.length))/
+                                labelword.length;
+                            var score = diff*Math.max((labelword.length - dis)/labelword.length, 0);
+                            return {
+                                keyword:keyword,
+                                score:score
                             }
-                        })
-                    })
-                    cans[index] = cans[index]?
-                        (
-                            // #of matching words
-                            cans[index] /
-                            // #of unique words
-                            (keywords.length + labelwords.length - cans[index])
-                        ):0;
-                    var highestValue =0;
-                    var highestPosition;
-                    cans.forEach(function(can, index){
-                        if(can > highestValue){
-                            highestValue = can;
-                            highestPosition = index;
-                        }
-                    })
-                    if(highestValue){ //if we have a sorted candidate
-                        meta['block_textures'] = blocks[blockNameIndex[highestPosition]];
-                    }
+                        }).reduce(function(a, b){
+                            return a.score > b.score?a:b;
+                        });
+                        bestWord.labelword = labelword;
+                        return bestWord;
+                    });
+                    var keyScore = matches.reduce(function(a, b){
+                        return {
+                            score:a.score+b.score
+                        };
+                    });
+                    keyScore.key = key;
+                    keyScore.index = blockIndex;
+                    return keyScore;
                 });
-                //match any string from simple name
-                if(!meta['block_textures']) Object.keys(blocks).forEach(function(key){
-                    if(key.indexOf(simpleName) !== -1){
-                        meta['block_textures'] = blocks[key]
-                    }
+                blockLabels = blockLabels.filter(function(item){
+                    return item.score !== 0;
+                }).sort(function(a, b){
+                    if(a.score < b.score) return 1;
+                    if(a.score > b.score) return -1;
+                    return 0;
                 });
-                //nothing? then stuff something in there
-                if(!meta['block_textures']){
-
-                    meta['block_textures'] = {
-                        side : 'glass.png'
-                    }
-                    if(meta.index == 3) meta.block_textures.side = 'dirt.png'
-                }
-                flatIndex[index] = meta;
+                meta['block_textures'] = blocks[blockLabels[0].key];
+                flatIndex[materialIndex] = meta;
                 if(finalMaterials[meta.index]){
                     if(!finalMaterials[meta.index].alternates)
                         finalMaterials[meta.index].alternates = [];
@@ -101,13 +111,17 @@ function minecraftLoader(directory, cb){
                 }else{
                     finalMaterials[meta.index] = meta;
                 }
+                if(materialIndex==1){
+                    meta['block_textures']= {side:'stone.png'};
+                }
             });
+            //process.exit();
             //if(!minecraftData[directory]) minecraftData[directory] = {};
             //skip air, trim records (work out non-continuity later)
             finalMaterials = finalMaterials.slice(1, 450).map(function(item){
                 if(item) return item;
                 else return { textures : {
-                    side : 'glass.png'
+                    side : 'mob_spawner.png'
                 }};
             });
             var control = {
@@ -121,18 +135,13 @@ function minecraftLoader(directory, cb){
                 toTextureList : function(){
                     var results = flatIndex.map(function(i){
                         var item = i.block_textures;
-                        if(item.top && item.bottom && item.side){
-                            return [item.top, item.bottom, item.side];
-                        }
-                        if(item.top && item.side){
-                            return [item.top, item.side, item.side];
-                        }
-                        if(item.bottom && item.side){
-                            return [item.side, item.bottom, item.side];
-                        }
-                        var single = item.side || item.block_side || item.block;
-                        //if(!(item.side || item.block_side)) console.log('sideless', item)
-                        return single || 'iron_bars.png';
+                        var side = item.side || item.block_side || item.block || item.normal;
+                        var top = item.top || item.bottom || side;
+                        var bottom = item.bottom || item.top || side;
+                        var front = item.front || side || item.back;
+                        var back = item.back || item.top || side;
+                        if(!(side || top || bottom)) return 'redstone_block.png';
+                        return [top, bottom, side, side, front, back];
                     });
                     return results;
                 },
