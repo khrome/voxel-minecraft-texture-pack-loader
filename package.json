@@ -24,7 +24,7 @@
     "dependencies": {
         "group-by-subsequence": "^0.0.3",
         "csv": "^2.0.0",
-        "levenshtein": "^1.0.5",
+        "levenshtein": "^1.0.5"
     },
     "devDependencies": {},
     "optionalDependencies": {},
