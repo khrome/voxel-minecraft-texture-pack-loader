@@ -114,6 +114,13 @@ function minecraftLoader(directory, cb){
                 if(materialIndex==1){
                     meta['block_textures']= {side:'stone.png'};
                 }
+		if(materialIndex==8){
+                    meta['block_textures']= {
+			side:'grass_side.png',
+                        bottom:'dirt.png',
+			top:'grass_top.png'
+		    };
+                }
             });
             //process.exit();
             //if(!minecraftData[directory]) minecraftData[directory] = {};
@@ -138,11 +145,12 @@ function minecraftLoader(directory, cb){
                         var side = item.side || item.block_side || item.block || item.normal;
                         var top = item.top || item.bottom || side;
                         var bottom = item.bottom || item.top || side;
-                        var front = item.front || side || item.back;
-                        var back = item.back || item.top || side;
+                        var front = item.front || side || item.back|| item.top;
+                        var back = item.back || side || item.top;
                         if(!(side || top || bottom)) return 'redstone_block.png';
-                        return [top, bottom, side, side, front, back];
-                    });
+			if(!side) side = top || bottom || front ||back ;
+                        return [back, front, top, bottom, side, side];
+                    }).slice(0, 200);
                     return results;
                 },
                 toString : function(){
