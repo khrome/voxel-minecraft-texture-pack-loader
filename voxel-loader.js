@@ -139,6 +139,9 @@ function minecraftLoader(directory, cb){
                 toArray : function(){
                     return finalMaterials;
                 },
+                toFlatArray : function(){
+                    return flatIndex;
+                },
                 toTextureList : function(){
                     var results = flatIndex.map(function(i){
                         var item = i.block_textures;

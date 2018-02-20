@@ -1,7 +1,7 @@
 {
     "name": "voxel-minecraft-texture-pack-loader",
     "homepage": "https://github.com/khrome/voxel-minecraft-texture-pack-loader",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "main": "voxel-loader.js",
     "description": "Load standard texture pack layouts",
     "keywords": [
